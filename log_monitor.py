@@ -65,13 +65,13 @@ class LogFileHandler(FileSystemEventHandler):
     
     def on_created(self, event):
         """Appelé quand un nouveau fichier est créé"""
-        if not event.is_directory and event.src_path.endswith('.log'):
+        if not event.is_directory and event.src_path.endswith('.txt'):
             logger.info(f"Nouveau fichier de log détecté: {event.src_path}")
             self._switch_to_new_file(event.src_path)
     
     def on_modified(self, event):
         """Appelé quand un fichier est modifié"""
-        if not event.is_directory and event.src_path.endswith('.log'):
+        if not event.is_directory and event.src_path.endswith('.txt'):
             if event.src_path == self.current_file:
                 self._read_new_lines(event.src_path)
     
@@ -150,7 +150,7 @@ class LogMonitor:
             # Parcourir récursivement tous les sous-répertoires
             for root, dirs, files in os.walk(self.logs_directory):
                 for file in files:
-                    if file.endswith('.log'):
+                    if file.endswith('.txt'):
                         file_path = os.path.join(root, file)
                         if os.path.isfile(file_path):
                             log_files.append(file_path)
