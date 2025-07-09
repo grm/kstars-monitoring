@@ -79,7 +79,7 @@ class DiscordSender:
             if len(content + log + "\n") > 1900:
                 content += "...\n*[Message tronqué]*"
                 break
-            content += f"```{log}```\n"
+            content += f"{log}\n"
         
         return self._send_message(content)
     
