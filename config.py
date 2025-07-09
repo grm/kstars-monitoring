@@ -15,6 +15,7 @@ class Config:
         self.rate_limit_delay = float(os.getenv('RATE_LIMIT_DELAY', '1.0'))
         self.batch_size = int(os.getenv('BATCH_SIZE', '10'))
         self.batch_timeout = float(os.getenv('BATCH_TIMEOUT', '30.0'))
+        self.file_check_interval = int(os.getenv('FILE_CHECK_INTERVAL', '60'))
         self.max_retries = int(os.getenv('MAX_RETRIES', '3'))
     
     def validate(self) -> bool:
@@ -43,5 +44,6 @@ Configuration:
 - Délai rate limit: {self.rate_limit_delay}s
 - Taille batch: {self.batch_size}
 - Timeout batch: {self.batch_timeout}s
+- Intervalle vérification fichiers: {self.file_check_interval}s
 - Max tentatives: {self.max_retries}
 """ 

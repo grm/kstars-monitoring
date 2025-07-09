@@ -65,7 +65,8 @@ class EKOSMonitor:
             logs_directory=self.config.ekos_logs_directory,
             discord_sender=self.discord_sender,
             batch_size=self.config.batch_size,
-            batch_timeout=self.config.batch_timeout
+            batch_timeout=self.config.batch_timeout,
+            file_check_interval=self.config.file_check_interval
         )
         
         logger.info("✅ Initialisation terminée")

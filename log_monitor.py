@@ -128,27 +128,35 @@ class LogFileHandler(FileSystemEventHandler):
 class LogMonitor:
     """Moniteur principal pour surveiller les logs EKOS"""
     
-    def __init__(self, logs_directory: str, discord_sender: DiscordSender, batch_size: int = 10, batch_timeout: float = 30.0):
+    def __init__(self, logs_directory: str, discord_sender: DiscordSender, batch_size: int = 10, batch_timeout: float = 30.0, file_check_interval: int = 60):
         self.logs_directory = logs_directory
         self.discord_sender = discord_sender
         self.batch_size = batch_size
         self.batch_timeout = batch_timeout
+        self.file_check_interval = file_check_interval
         self.observer = Observer()
         self.handler = LogFileHandler(discord_sender, batch_size, batch_timeout)
         self.running = False
+        self.last_file_check = 0
+        
+        # Thread pour vérifier périodiquement le fichier le plus récent
+        self.file_check_thread = threading.Thread(target=self._periodic_file_check, daemon=True)
     
-    def _find_latest_log_file(self) -> Optional[str]:
-        """Trouver le fichier de log le plus récent"""
+    def _find_latest_log_file_recursive(self) -> Optional[str]:
+        """Trouver le fichier de log le plus récent dans tous les sous-répertoires"""
         try:
             log_files = []
-            for file in os.listdir(self.logs_directory):
-                if file.endswith('.log'):
-                    file_path = os.path.join(self.logs_directory, file)
-                    if os.path.isfile(file_path):
-                        log_files.append(file_path)
+            
+            # Parcourir récursivement tous les sous-répertoires
+            for root, dirs, files in os.walk(self.logs_directory):
+                for file in files:
+                    if file.endswith('.log'):
+                        file_path = os.path.join(root, file)
+                        if os.path.isfile(file_path):
+                            log_files.append(file_path)
             
             if not log_files:
-                logger.warning("Aucun fichier de log trouvé dans le répertoire")
+                logger.warning("Aucun fichier de log trouvé dans le répertoire et ses sous-répertoires")
                 return None
             
             # Trier par date de modification (le plus récent en premier)
@@ -160,6 +168,27 @@ class LogMonitor:
             logger.error(f"Erreur lors de la recherche du fichier de log le plus récent: {e}")
             return None
     
+    def _periodic_file_check(self):
+        """Vérifier périodiquement s'il y a un fichier de log plus récent"""
+        while self.running:
+            try:
+                current_time = time.time()
+                
+                # Vérifier selon l'intervalle configuré
+                if current_time - self.last_file_check >= self.file_check_interval:
+                    self.last_file_check = current_time
+                    
+                    latest_file = self._find_latest_log_file_recursive()
+                    if latest_file and latest_file != self.handler.current_file:
+                        logger.info(f"Nouveau fichier de log détecté lors de la vérification périodique: {latest_file}")
+                        self.handler._switch_to_new_file(latest_file)
+                
+                time.sleep(10)  # Vérifier toutes les 10 secondes
+                
+            except Exception as e:
+                logger.error(f"Erreur lors de la vérification périodique: {e}")
+                time.sleep(30)  # Attendre plus longtemps en cas d'erreur
+    
     def start(self):
         """Démarrer la surveillance des logs"""
         if self.running:
@@ -167,19 +196,22 @@ class LogMonitor:
             return
         
         # Trouver le fichier de log le plus récent
-        latest_file = self._find_latest_log_file()
+        latest_file = self._find_latest_log_file_recursive()
         if latest_file:
             self.handler._switch_to_new_file(latest_file)
         
-        # Configurer l'observateur
-        self.observer.schedule(self.handler, self.logs_directory, recursive=False)
+        # Configurer l'observateur pour surveiller récursivement
+        self.observer.schedule(self.handler, self.logs_directory, recursive=True)
         self.observer.start()
         self.running = True
+        
+        # Démarrer le thread de vérification périodique
+        self.file_check_thread.start()
         
         # Envoyer le message de démarrage
         self.discord_sender.send_startup_message()
         
-        logger.info(f"Surveillance démarrée pour le répertoire: {self.logs_directory}")
+        logger.info(f"Surveillance démarrée pour le répertoire: {self.logs_directory} (récursif)")
     
     def stop(self):
         """Arrêter la surveillance des logs"""

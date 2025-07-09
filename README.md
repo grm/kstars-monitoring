@@ -4,7 +4,9 @@ Application Python pour surveiller les logs d'EKOS et les envoyer vers un canal 
 
 ## 🚀 Fonctionnalités
 
-- **Surveillance automatique** : Détecte le fichier de log le plus récent dans un répertoire
+- **Surveillance automatique** : Détecte le fichier de log le plus récent dans un répertoire et ses sous-répertoires
+- **Recherche récursive** : Parcourt tous les sous-répertoires pour trouver les logs EKOS
+- **Vérification périodique** : Vérifie régulièrement s'il y a un nouveau fichier de log plus récent
 - **Envoi en temps réel** : Envoie les nouvelles lignes de logs vers Discord
 - **Rate limiting intelligent** : Évite les limitations Discord avec gestion des délais
 - **Batching avec timeout** : Envoi par batch avec délai configurable pour la réactivité
@@ -53,6 +55,7 @@ LOG_LEVEL=INFO
 RATE_LIMIT_DELAY=1.0
 BATCH_SIZE=10
 BATCH_TIMEOUT=30.0
+FILE_CHECK_INTERVAL=60
 MAX_RETRIES=3
 ```
 
@@ -66,6 +69,7 @@ MAX_RETRIES=3
 | `RATE_LIMIT_DELAY` | Délai entre les envois (secondes) | 1.0 |
 | `BATCH_SIZE` | Nombre de logs par message | 10 |
 | `BATCH_TIMEOUT` | Délai max avant envoi forcé (secondes) | 30.0 |
+| `FILE_CHECK_INTERVAL` | Intervalle de vérification des fichiers (secondes) | 60 |
 | `MAX_RETRIES` | Nombre max de tentatives en cas d'échec | 3 |
 
 ## 🚀 Utilisation
@@ -87,11 +91,12 @@ python main.py
 
 ## 📊 Fonctionnement
 
-1. **Détection du fichier le plus récent** : L'application scanne le répertoire et identifie le fichier `.log` le plus récent
+1. **Recherche récursive** : L'application scanne récursivement le répertoire et identifie le fichier `.log` le plus récent
 2. **Surveillance en temps réel** : Utilise `watchdog` pour détecter les modifications du fichier
-3. **Collecte des nouvelles lignes** : Lit uniquement les nouvelles lignes ajoutées depuis le démarrage
-4. **Envoi par batch avec timeout** : Accumule les logs et les envoie par groupes ou après un délai configurable
-5. **Rate limiting** : Respecte les limitations Discord avec des délais configurables
+3. **Vérification périodique** : Vérifie régulièrement s'il y a un nouveau fichier de log plus récent
+4. **Collecte des nouvelles lignes** : Lit uniquement les nouvelles lignes ajoutées depuis le démarrage
+5. **Envoi par batch avec timeout** : Accumule les logs et les envoie par groupes ou après un délai configurable
+6. **Rate limiting** : Respecte les limitations Discord avec des délais configurables
 
 ## 🔧 Stratégie de Batching et Rate Limiting
 
@@ -113,6 +118,32 @@ L'application implémente une stratégie hybride pour optimiser les performances
 - Si 5 logs arrivent rapidement → envoi après 30s
 - Si 10 logs arrivent rapidement → envoi immédiat
 - Si 3 logs arrivent, puis 2 autres 20s plus tard → envoi après 30s supplémentaires
+
+## 🔍 Recherche récursive et vérification périodique
+
+L'application gère intelligemment la structure de répertoires d'EKOS :
+
+### Recherche récursive
+- **Parcours complet** : Explore tous les sous-répertoires
+- **Détection automatique** : Trouve le fichier `.log` le plus récent
+- **Gestion des dates** : Fonctionne avec la structure par jour d'EKOS
+
+### Vérification périodique
+- **Intervalle configurable** : `FILE_CHECK_INTERVAL` (défaut: 60s)
+- **Détection des redémarrages** : Détecte quand EKOS crée un nouveau répertoire
+- **Basculement automatique** : Passe automatiquement au nouveau fichier de log
+
+### Exemple de structure supportée
+```
+/ekos/logs/
+├── 2024-01-15/
+│   ├── ekos_2024-01-15.log
+│   └── ekos_2024-01-15_restart.log
+├── 2024-01-16/
+│   └── ekos_2024-01-16.log
+└── 2024-01-17/
+    └── ekos_2024-01-17.log  ← Fichier surveillé
+```
 
 ## 📝 Logs de l'application
 
@@ -138,7 +169,7 @@ L'application génère ses propres logs dans :
 
 3. **Aucun fichier de log**
    ```
-   Aucun fichier de log trouvé dans le répertoire
+   Aucun fichier de log trouvé dans le répertoire et ses sous-répertoires
    ```
    → Vérifiez que le répertoire contient des fichiers `.log`
 
